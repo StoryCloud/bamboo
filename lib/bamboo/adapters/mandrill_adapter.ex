@@ -58,6 +58,7 @@ defmodule Bamboo.MandrillAdapter do
   defp get_key(config) do
     case Map.get(config, :api_key) do
       nil -> raise_api_key_error(config)
+      {:system, var} when is_binary(var) -> System.get_env(var)
       key -> key
     end
   end
