@@ -31,8 +31,12 @@ defmodule Bamboo.MandrillAdapter do
     api_key = get_key(config)
     params = email |> convert_to_mandrill_params(api_key) |> Poison.encode!
     uri = [base_uri(), "/", api_path(email)]
+    opts = case Map.get(config, :recv_timeout) do
+             nil -> [:with_body]
+             val -> [:with_body, recv_timeout: val]
+           end
 
-    case :hackney.post(uri, headers(), params, [:with_body]) do
+    case :hackney.post(uri, headers(), params, opts) do
       {:ok, status, _headers, response} when status > 299 ->
         filtered_params = params |> Poison.decode! |> Map.put("key", "[FILTERED]")
         raise_api_error(@service_name, response, filtered_params)

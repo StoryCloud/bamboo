@@ -139,11 +139,12 @@ defmodule Bamboo.Mailer do
   end
 
   defp debug_sent(email, adapter) do
-    Logger.debug """
-    Sending email with #{inspect adapter}:
+    Logger.debug fn -> """
+      Sending email with #{inspect adapter}:
 
-    #{inspect email, limit: :infinity}
+      #{inspect email, limit: :infinity}
     """
+    end
   end
 
   defp debug_unsent(email) do
