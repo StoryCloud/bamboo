@@ -13,7 +13,8 @@ defmodule Bamboo.SendGridHelper do
   alias Bamboo.Email
 
   @id_size 36
-  @field_name "x-smtpapi"
+  @field_name :send_grid_template
+  @categories :categories
 
   @doc """
   Specify the template for SendGrid to use for the context of the substitution
@@ -26,11 +27,14 @@ defmodule Bamboo.SendGridHelper do
   """
   def with_template(email, template_id) do
     if byte_size(template_id) == @id_size do
-      xsmtpapi = Map.get(email.private, @field_name, %{})
+      template = Map.get(email.private, @field_name, %{})
+
       email
-      |> Email.put_private(@field_name, set_template(xsmtpapi, template_id))
+      |> Email.put_private(@field_name, set_template(template, template_id))
     else
-      raise "expected the template_id parameter to be a UUID 36 characters long, got #{template_id}"
+      raise "expected the template_id parameter to be a UUID 36 characters long, got #{
+              template_id
+            }"
     end
   end
 
@@ -47,34 +51,47 @@ defmodule Bamboo.SendGridHelper do
   """
   def substitute(email, tag, value) do
     if is_binary(tag) do
-      xsmtpapi = Map.get(email.private, @field_name, %{})
+      template = Map.get(email.private, @field_name, %{})
+
       email
-      |> Email.put_private(@field_name, add_subsitution(xsmtpapi, tag, value))
+      |> Email.put_private(@field_name, add_substitution(template, tag, value))
     else
       raise "expected the tag parameter to be of type binary, got #{tag}"
     end
   end
 
-  defp set_template(xsmtpapi, template_id) do
-    xsmtpapi
-    |> Map.merge(%{"filters" => build_template_filter(template_id)})
+  @doc """
+  An array of category names for this email. A maximum of 10 categories can be assigned to an email.
+  Duplicate categories will be ignored and only unique entries will be sent. 
+
+  ## Example
+
+      email
+      |> with_categories("campaign-12345")
+  """
+  def with_categories(email, categories) when is_list(categories) do
+    categories =
+      (Map.get(email.private, @categories, []) ++ categories)
+      |> MapSet.new()
+      |> MapSet.to_list()
+
+    email
+    |> Email.put_private(@categories, Enum.slice(categories, 0, 10))
   end
 
-  defp add_subsitution(xsmtpapi, tag, value) do
-    xsmtpapi
-    |> Map.update("sub", %{tag => [value]}, fn substitutions ->
-      Map.merge(substitutions, %{tag => [value]})
+  def with_categories(_email, _categories) do
+    raise "expected a list of category strings"
+  end
+
+  defp set_template(template, template_id) do
+    template
+    |> Map.merge(%{template_id: template_id})
+  end
+
+  defp add_substitution(template, tag, value) do
+    template
+    |> Map.update(:substitutions, %{tag => value}, fn substitutions ->
+      Map.merge(substitutions, %{tag => value})
     end)
-  end
-
-  defp build_template_filter(template_id) do
-    %{
-      "templates" => %{
-        "settings" => %{
-          "enable" => 1,
-          "template_id" => template_id
-        }
-      }
-    }
   end
 end
